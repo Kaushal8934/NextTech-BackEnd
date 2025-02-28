@@ -1,7 +1,7 @@
-NextTech-BackEnd
+# NextTech-BackEnd
 This is the backend of next tech application
 
-NextTech Backend Setup
+# NextTech Backend Setup
 Step 1: gh clone repository name
 Step 2: open the project in IDE
 Step 3: open the terminal of IDE

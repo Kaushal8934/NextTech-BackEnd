@@ -1,0 +1,78 @@
+package com.nexttech.backend.service;
+
+import com.nexttech.backend.dto.*;
+import com.nexttech.backend.model.User;
+import com.nexttech.backend.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final AuthenticationManager authenticationManager;
+    private final JavaMailSender mailSender; // You'll need to configure this in application.properties
+
+    // Temporary storage for OTPs (Key: Email, Value: OTP)
+    // In production, use Redis with an expiration time!
+    private final Map<String, String> otpCache = new HashMap<>();
+
+    public void generateAndSendOtp(String email) {
+        // 1. Generate a 6-digit random code
+        String otp = String.format("%06d", new Random().nextInt(999999));
+
+        // 2. Save to cache
+        otpCache.put(email, otp);
+
+        // 3. Send via Email
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(email);
+        message.setSubject("NEXT TECH Technology pvt ltd : ");
+        message.setText("Your one-time password is: " + otp + ". It will expire in 5 minutes.");
+        mailSender.send(message);
+    }
+
+    public boolean verifyOtp(String email, String otpCode) {
+        String cachedOtp = otpCache.get(email);
+
+        if (cachedOtp == null || !cachedOtp.equals(otpCode)) {
+            throw new RuntimeException("Invalid or expired OTP");
+        }
+
+        otpCache.remove(email);
+        return true;
+    }
+
+    public AuthResponse register(AuthRequest request) {
+        // Logic remains the same, but you might want to check if email was verified first
+        var user = User.builder()
+                .username(request.getUsername())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .isActive(true)
+                .build();
+        userRepository.save(user);
+        var jwtToken = jwtService.generateToken(user);
+        return AuthResponse.builder().token(jwtToken).build();
+    }
+
+    public AuthResponse authenticate(LoginRequest request) {
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+        );
+        var user = userRepository.findByUsername(request.getUsername()).orElseThrow();
+        var jwtToken = jwtService.generateToken(user);
+        return AuthResponse.builder().token(jwtToken).build();
+    }
+}

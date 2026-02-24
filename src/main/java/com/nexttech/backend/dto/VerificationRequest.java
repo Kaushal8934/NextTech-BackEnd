@@ -11,6 +11,5 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class VerificationRequest {
     private String email;
-    private String phoneNumber;
 }
 

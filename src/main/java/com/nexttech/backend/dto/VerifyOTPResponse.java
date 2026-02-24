@@ -14,5 +14,4 @@ public class VerifyOTPResponse {
     private String email;
     private boolean isEmailVerified;
     private boolean userAlreadyExists;
-    private Long userId;
 }

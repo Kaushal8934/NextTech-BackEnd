@@ -1,6 +1,7 @@
 package com.nexttech.backend.service;
 
 import com.nexttech.backend.dto.*;
+import com.nexttech.backend.exception.AppExceptions;
 import com.nexttech.backend.model.User;
 import com.nexttech.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -58,12 +59,14 @@ public class AuthService {
                 .email(email)
                 .isEmailVerified(isEmailVerified)
                 .userAlreadyExists(userAlreadyExists)
-                .userId(user.getId())
                 .build();
     }
 
     public AuthResponse register(AuthRequest request) {
-        var user = User.builder()
+        if (userRepository.existsByUsername(request.getUsername()) || userRepository.existsByEmail(request.getEmail())) {
+            throw new AppExceptions.UserAlreadyExistsException("User already exists");
+        }
+        User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .firstName(request.getFirstName())

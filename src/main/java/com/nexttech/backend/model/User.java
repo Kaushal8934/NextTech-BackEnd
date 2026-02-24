@@ -38,7 +38,7 @@ public class User implements UserDetails {
     private String lastName;
 
     @Column(name = "mobile_number")
-    private String mobileNumber;
+    private Long mobileNumber;
 
     @Column(name = "profile_pic")
     private String profilePic;
@@ -50,7 +50,7 @@ public class User implements UserDetails {
     private boolean isPhoneVerified = false;
 
     @Column(name = "login_device_id")
-    private String loginDeviceId;
+    private Long loginDeviceId;
 
     @Column(name = "login_device_os")
     private String loginDeviceOs;

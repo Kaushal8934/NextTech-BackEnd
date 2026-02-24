@@ -15,4 +15,10 @@ public class AuthRequest {
     private String username;
     private String email;
     private String password;
+    private String firstName;
+    private String lastName;
+    private Long mobileNumber;
+    private Long loginDeviceId;
+    private String loginDeviceOs;
+    private boolean isEmailVerified;
 }

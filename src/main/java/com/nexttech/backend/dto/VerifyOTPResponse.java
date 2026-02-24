@@ -1,5 +1,6 @@
 package com.nexttech.backend.dto;
 
+import com.nexttech.backend.model.User;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -9,11 +10,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class AuthResponse {
-    private String username;
+public class VerifyOTPResponse {
     private String email;
-    private String token;
-    private String firstName;
-    private String lastName;
-    private Long mobileNumber;
+    private boolean isEmailVerified;
+    private boolean userAlreadyExists;
+    private Long userId;
 }

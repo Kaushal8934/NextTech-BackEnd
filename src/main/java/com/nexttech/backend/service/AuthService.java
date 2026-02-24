@@ -11,8 +11,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 
 @Service
@@ -43,28 +45,47 @@ public class AuthService {
         mailSender.send(message);
     }
 
-    public boolean verifyOtp(String email, String otpCode) {
-        String cachedOtp = otpCache.get(email);
+    public VerifyOTPResponse verifyOtp(String email, String otpCode) {
 
-        if (cachedOtp == null || !cachedOtp.equals(otpCode)) {
-            throw new RuntimeException("Invalid or expired OTP");
-        }
+        String cachedOtp = otpCache.get(email);
+        boolean isEmailVerified = cachedOtp != null && cachedOtp.equals(otpCode);
+
+        User user = userRepository.findByEmail(email);
+        boolean userAlreadyExists = user != null && user.getEmail().equals(email);
 
         otpCache.remove(email);
-        return true;
+        return VerifyOTPResponse.builder()
+                .email(email)
+                .isEmailVerified(isEmailVerified)
+                .userAlreadyExists(userAlreadyExists)
+                .userId(user.getId())
+                .build();
     }
 
     public AuthResponse register(AuthRequest request) {
-        // Logic remains the same, but you might want to check if email was verified first
         var user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .mobileNumber(request.getMobileNumber())
+                .loginDeviceId(request.getLoginDeviceId())
+                .loginDeviceOs(request.getLoginDeviceOs())
+                .lastLoginAt(LocalDateTime.now())
                 .password(passwordEncoder.encode(request.getPassword()))
+                .isEmailVerified(request.isEmailVerified())
                 .isActive(true)
                 .build();
         userRepository.save(user);
         var jwtToken = jwtService.generateToken(user);
-        return AuthResponse.builder().token(jwtToken).build();
+        return AuthResponse.builder()
+                .token(jwtToken)
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .mobileNumber(user.getMobileNumber())
+                .build();
     }
 
     public AuthResponse authenticate(LoginRequest request) {
@@ -73,6 +94,13 @@ public class AuthService {
         );
         var user = userRepository.findByUsername(request.getUsername()).orElseThrow();
         var jwtToken = jwtService.generateToken(user);
-        return AuthResponse.builder().token(jwtToken).build();
+        return AuthResponse.builder()
+                .token(jwtToken)
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .username(user.getUsername())
+                .email(user.getEmail())
+                .mobileNumber(user.getMobileNumber())
+                .build();
     }
 }

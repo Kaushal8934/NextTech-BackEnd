@@ -55,10 +55,13 @@ public class AuthService {
         boolean userAlreadyExists = user != null && user.getEmail().equals(email);
 
         otpCache.remove(email);
+        var jwtToken = jwtService.generateToken(user);
+
         return VerifyOTPResponse.builder()
                 .email(email)
                 .isEmailVerified(isEmailVerified)
                 .userAlreadyExists(userAlreadyExists)
+                .token(jwtToken)
                 .build();
     }
 

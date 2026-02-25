@@ -1,8 +1,10 @@
+server:
+  port: ${PORT:8080}
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/next_tech_db
-    username: postgres
-    password: postgres
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/next_tech_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
   jpa:

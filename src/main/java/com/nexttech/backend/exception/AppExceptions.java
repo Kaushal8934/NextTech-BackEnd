@@ -14,5 +14,15 @@ public class AppExceptions {
         }
     }
 
-    // Add more as needed...
+    public static class InvalidOtpException extends RuntimeException {
+        public InvalidOtpException(String message) {
+            super(message);
+        }
+    }
+
+    public static class OtpExpiredException extends RuntimeException {
+        public OtpExpiredException(String message) {
+            super(message);
+        }
+    }
 }

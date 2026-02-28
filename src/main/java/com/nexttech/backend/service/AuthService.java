@@ -7,73 +7,87 @@ import com.nexttech.backend.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+    private static final Duration OTP_TTL = Duration.ofMinutes(5);
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
-    private final JavaMailSender mailSender; // You'll need to configure this in application.properties
+    private final JavaMailSender mailSender;
 
-    // Temporary storage for OTPs (Key: Email, Value: OTP)
-    // In production, use Redis with an expiration time!
-    private final Map<String, String> otpCache = new HashMap<>();
+    private final Map<String, OtpEntry> otpCache = new ConcurrentHashMap<>();
 
     public void generateAndSendOtp(String email) {
-        // 1. Generate a 6-digit random code
-        String otp = String.format("%06d", new Random().nextInt(999999));
+        String normalizedEmail = normalize(email);
+        String otp = String.format("%06d", SECURE_RANDOM.nextInt(1_000_000));
+        LocalDateTime expiresAt = LocalDateTime.now().plus(OTP_TTL);
 
-        // 2. Save to cache
-        otpCache.put(email, otp);
+        otpCache.put(normalizedEmail, new OtpEntry(otp, expiresAt));
 
-        // 3. Send via Email
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(email);
+        message.setTo(normalizedEmail);
         message.setSubject("NEXT TECH Technology pvt ltd : ");
-        message.setText("Your one-time password is: " + otp + ". It will expire in 5 minutes.");
+        message.setText("Your one-time password is: " + otp + ". It will expire in " + OTP_TTL.toMinutes() + " minutes.");
         mailSender.send(message);
     }
 
     public VerifyOTPResponse verifyOtp(String email, String otpCode) {
+        String normalizedEmail = normalize(email);
+        OtpEntry entry = otpCache.get(normalizedEmail);
 
-        String cachedOtp = otpCache.get(email);
-        boolean isEmailVerified = cachedOtp != null && cachedOtp.equals(otpCode);
+        if (entry == null) {
+            throw new AppExceptions.InvalidOtpException("OTP is invalid");
+        }
+        if (entry.expiresAt().isBefore(LocalDateTime.now())) {
+            otpCache.remove(normalizedEmail);
+            throw new AppExceptions.OtpExpiredException("OTP has expired");
+        }
+        if (!entry.code().equals(otpCode)) {
+            throw new AppExceptions.InvalidOtpException("OTP is invalid");
+        }
 
-        User user = userRepository.findByEmail(email);
-        boolean userAlreadyExists = user != null && user.getEmail().equals(email);
-
-        otpCache.remove(email);
-        var jwtToken = jwtService.generateToken(user);
+        otpCache.remove(normalizedEmail);
+        User user = userRepository.findByEmail(normalizedEmail);
+        boolean userAlreadyExists = user != null;
+        String jwtToken = userAlreadyExists ? jwtService.generateToken(user) : null;
 
         return VerifyOTPResponse.builder()
-                .email(email)
-                .isEmailVerified(isEmailVerified)
+                .email(normalizedEmail)
+                .isEmailVerified(true)
                 .userAlreadyExists(userAlreadyExists)
                 .token(jwtToken)
                 .build();
     }
 
     public AuthResponse register(AuthRequest request) {
-        if (userRepository.existsByUsername(request.getUsername()) || userRepository.existsByEmail(request.getEmail())) {
+        String username = request.getUsername().trim();
+        String email = normalize(request.getEmail());
+
+        if (userRepository.existsByUsername(username) || userRepository.existsByEmail(email)) {
             throw new AppExceptions.UserAlreadyExistsException("User already exists");
         }
         User user = User.builder()
-                .username(request.getUsername())
-                .email(request.getEmail())
-                .firstName(request.getFirstName())
-                .lastName(request.getLastName())
+                .username(username)
+                .email(email)
+                .firstName(request.getFirstName().trim())
+                .lastName(request.getLastName().trim())
                 .mobileNumber(request.getMobileNumber())
                 .loginDeviceId(request.getLoginDeviceId())
                 .loginDeviceOs(request.getLoginDeviceOs())
@@ -95,10 +109,20 @@ public class AuthService {
     }
 
     public AuthResponse authenticate(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword())
+        String username = request.getUsername().trim();
+        try {
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(username, request.getPassword())
+            );
+        } catch (BadCredentialsException ex) {
+            throw new AppExceptions.InvalidCredentialsException("Invalid username or password");
+        } catch (AuthenticationException ex) {
+            throw new AppExceptions.InvalidCredentialsException("Authentication failed");
+        }
+
+        var user = userRepository.findByUsername(username).orElseThrow(
+                () -> new AppExceptions.InvalidCredentialsException("Invalid username or password")
         );
-        var user = userRepository.findByUsername(request.getUsername()).orElseThrow();
         var jwtToken = jwtService.generateToken(user);
         return AuthResponse.builder()
                 .token(jwtToken)
@@ -109,4 +133,10 @@ public class AuthService {
                 .mobileNumber(user.getMobileNumber())
                 .build();
     }
+
+    private String normalize(String value) {
+        return value == null ? null : value.trim().toLowerCase();
+    }
+
+    private record OtpEntry(String code, LocalDateTime expiresAt) {}
 }

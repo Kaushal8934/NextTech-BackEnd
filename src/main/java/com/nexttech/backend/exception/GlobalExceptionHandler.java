@@ -3,6 +3,7 @@ package com.nexttech.backend.exception;
 import com.nexttech.backend.dto.ErrorDetails;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -35,6 +36,44 @@ public class GlobalExceptionHandler {
                 HttpStatus.UNAUTHORIZED.value()
         );
         return new ResponseEntity<>(errorDetails, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(AppExceptions.InvalidOtpException.class)
+    public ResponseEntity<ErrorDetails> handleInvalidOtp(AppExceptions.InvalidOtpException ex, WebRequest request) {
+        ErrorDetails errorDetails = new ErrorDetails(
+                LocalDateTime.now(),
+                ex.getMessage(),
+                request.getDescription(false),
+                HttpStatus.UNAUTHORIZED.value()
+        );
+        return new ResponseEntity<>(errorDetails, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(AppExceptions.OtpExpiredException.class)
+    public ResponseEntity<ErrorDetails> handleOtpExpired(AppExceptions.OtpExpiredException ex, WebRequest request) {
+        ErrorDetails errorDetails = new ErrorDetails(
+                LocalDateTime.now(),
+                ex.getMessage(),
+                request.getDescription(false),
+                HttpStatus.GONE.value()
+        );
+        return new ResponseEntity<>(errorDetails, HttpStatus.GONE);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorDetails> handleValidation(MethodArgumentNotValidException ex, WebRequest request) {
+        String message = ex.getBindingResult().getFieldErrors().isEmpty()
+                ? "Validation failed"
+                : ex.getBindingResult().getFieldErrors().get(0).getField() + ": " +
+                ex.getBindingResult().getFieldErrors().get(0).getDefaultMessage();
+
+        ErrorDetails errorDetails = new ErrorDetails(
+                LocalDateTime.now(),
+                message,
+                request.getDescription(false),
+                HttpStatus.BAD_REQUEST.value()
+        );
+        return new ResponseEntity<>(errorDetails, HttpStatus.BAD_REQUEST);
     }
 
     // 3. Handle Resource Not Found (404 Not Found)
